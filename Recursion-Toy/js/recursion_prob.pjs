@@ -1,0 +1,341 @@
+
+/**
+This version of random just wraps the uniform ERP
+All the generative code will use it.
+**/
+var numRandCalls = 0
+function random(min, max) {
+	numRandCalls += 1
+	return uniform(min, max)
+}
+
+
+/**
+Use my own set of branches, so the main code doesn't try to draw this stuff.
+**/
+var BRANCHES = [];
+
+
+/**
+Duplicate of Branch which will have its code prob transformed.
+**/
+var Branch = function(x, y, theta, radius, scale, generation) {
+
+	// console.log("I'm a branch")
+
+	this.x           = x;
+	this.y           = y;
+	this.ox          = x;
+	this.oy          = y;
+	this.x1          = NaN;
+	this.x2          = NaN;
+	this.y1          = NaN;
+	this.y2          = NaN;
+	this.scale       = scale || 1.0;
+	this.theta       = theta;
+	this.oTheta      = theta;
+	this.radius      = radius;
+	this.generation  = generation || 1;
+	this.growing     = true;
+	this.age         = 0;
+
+	this.wanderStep  = random(CONFIG.MIN_WANDER_STEP, CONFIG.MAX_WANDER_STEP);
+	this.growthRate  = random(CONFIG.MIN_GROWTH_RATE, CONFIG.MAX_GROWTH_RATE);
+	this.shrinkRate  = random(CONFIG.MIN_SHRINK_RATE, CONFIG.MAX_SHRINK_RATE);
+}
+
+Branch.prototype = {
+
+	update: function() {
+		
+		if(this.growing) {
+			
+			this.ox = this.x;
+			this.oy = this.y;
+			this.oTheta = this.theta;
+
+			this.theta += random(-this.wanderStep, this.wanderStep);
+
+			this.x += Math.cos(this.theta) * this.growthRate * this.scale;
+			this.y += Math.sin(this.theta) * this.growthRate * this.scale;
+
+			this.scale  *= this.shrinkRate;
+
+			// Branch
+			if(BRANCHES.length < CONFIG.MAX_CONCURRENT && random(0,1) < CONFIG.BRANCH_PROBABILITY) {
+				
+				var offset = random(CONFIG.MIN_DIVERGENCE, CONFIG.MAX_DIVERGENCE);
+				var theta  = this.theta + offset * (random(0,1) < 0.5 ? 1 : -1);
+				var scale  = this.scale * 0.95;
+				var radius = this.radius * scale;
+				var branch = new Branch(this.x, this.y, theta, radius, scale);
+
+				branch.generation = this.generation + 1;
+
+				BRANCHES.push(branch);
+			}
+
+			// Limit
+			if(this.radius * this.scale <= CONFIG.MIN_RADIUS) {
+				this.growing = false;
+			}
+
+			this.age++;
+		}
+	},
+
+	render: function(context) {
+
+		if(this.growing) {
+
+			var x1, x2, y1, y2;
+			var scale = this.scale;
+			var radius = this.radius * scale;
+
+			context.save();
+
+			switch(CONFIG.RENDER_MODE) {
+
+				case RENDER_MODES.Segmented :
+
+					// Draw outline
+					context.beginPath();
+					context.moveTo(this.ox, this.oy);
+					context.lineTo(this.x, this.y);
+					
+					if(radius > 5.0) {
+						context.shadowOffsetX = 1;
+						context.shadowOffsetY = 1;
+						context.shadowBlur    = scale;
+						context.shadowColor   = 'rgba(0,0,0,0.05)';	
+					}
+					
+					context.lineWidth = radius + scale;
+					context.strokeStyle = '#000';
+					context.lineCap = 'round';
+					context.stroke();
+					context.closePath();
+					
+					// Draw fill
+					context.beginPath();
+					context.moveTo(this.ox, this.oy);
+					context.lineTo(this.x, this.y);
+
+					context.lineWidth = radius;
+					context.strokeStyle = '#FFF';
+					context.lineCap = 'round';
+					context.stroke();
+
+					context.closePath();
+
+					break;
+				
+				case RENDER_MODES.Sketched :
+
+					radius *= 0.5;
+					radius += 0.5;
+
+					x1 = this.x + Math.cos(this.theta - HALF_PI) * radius;
+					x2 = this.x + Math.cos(this.theta + HALF_PI) * radius;
+
+					y1 = this.y + Math.sin(this.theta - HALF_PI) * radius;
+					y2 = this.y + Math.sin(this.theta + HALF_PI) * radius;
+
+					context.lineWidth = 0.5 + scale;
+					context.strokeStyle = '#000';
+					context.fillStyle = '#FFF';
+					context.lineCap = 'round';
+					
+					// Starting point
+					if(this.generation === 1 && this.age === 1) {
+						context.beginPath();
+						context.arc(this.x, this.y, radius, 0, TWO_PI);
+						context.stroke();
+						context.fill();
+					}
+
+					// Draw sides
+					if(this.age > 1) {
+						context.beginPath();
+						context.moveTo(this.x1, this.y1);
+						context.lineTo(x1, y1);
+						context.moveTo(this.x2, this.y2);
+						context.lineTo(x2, y2);
+						context.stroke();
+					}
+
+					// Draw ribbon
+					context.beginPath();
+					context.moveTo(this.x1, this.y1);
+					context.lineTo(x1, y1);
+					context.lineTo(x2, y2);
+					context.lineTo(this.x2, this.y2);
+					context.closePath();
+					context.fill();
+
+					this.x1 = x1;
+					this.x2 = x2;
+
+					this.y1 = y1;
+					this.y2 = y2;
+
+					break;
+
+				case RENDER_MODES.Darkness :
+
+					radius *= 0.5;
+
+					x1 = this.x + Math.cos(this.theta - HALF_PI) * radius;
+					x2 = this.x + Math.cos(this.theta + HALF_PI) * radius;
+
+					y1 = this.y + Math.sin(this.theta - HALF_PI) * radius;
+					y2 = this.y + Math.sin(this.theta + HALF_PI) * radius;
+
+					context.lineWidth = scale;
+					context.strokeStyle = 'rgba(255,255,255,0.9)';
+					context.lineCap = 'round';
+					context.fillStyle = '#111';
+
+					// Starting point
+					if(this.generation === 1 && this.age === 1) {
+						context.beginPath();
+						context.arc(this.x, this.y, radius, 0, TWO_PI);
+						context.closePath();
+						context.fill();
+						context.stroke();
+					}
+					
+					// Shadow
+					if(scale > 0.05) {
+						context.shadowOffsetX = scale;
+						context.shadowOffsetY = scale;
+						context.shadowBlur    = scale;
+						context.shadowColor   = '#111';	
+					}	
+
+					// Draw ribbon
+					context.beginPath();
+					context.moveTo(this.x1, this.y1);
+					context.lineTo(x1, y1);
+					context.lineTo(x2, y2);
+					context.lineTo(this.x2, this.y2);
+					context.closePath();
+					context.fill();
+
+					// Draw sides
+					if(this.age > 1 && scale > 0.1) {
+						context.beginPath();
+						context.moveTo(this.x1, this.y1);
+						context.lineTo(x1, y1);
+						context.moveTo(this.x2, this.y2);
+						context.lineTo(x2, y2);
+						context.stroke();
+					}
+
+					this.x1 = x1;
+					this.x2 = x2;
+
+					this.y1 = y1;
+					this.y2 = y2;
+
+					break;
+			}
+			
+			context.restore();
+		}
+	},
+
+	destroy: function() {
+		
+	}
+};
+
+
+
+/**
+Runs the recursive process to generate a new tree thingy.
+Optionally renders the thingy to the canvas.
+Optionally prints out performance stats
+**/
+var context = null
+var canvas = null
+function _generate(options)
+{
+	options = options || {}
+	var doRender = options.doRender
+	var doProfile = options.doProfile
+
+	var t0 = 0
+	if (doProfile)
+	{
+		numRandCalls = 0
+		t0 = performance.now()
+	}
+
+	// Clear out anything currently living in BRANCHES (there shouldn't be anything
+	//    here if the last call finished correctly, but what the heck)
+	for(var i = 0, n = BRANCHES.length; i < n; i++) {
+		BRANCHES[i].destroy();
+	}
+	BRANCHES = [];
+
+	// Also clear the canvas, if we're rendering
+	if (doRender)
+	{
+		if (!context || !canvas)
+		{
+			context = Recursion.getContext()
+			canvas = Recursion.getCanvas()
+		}
+		canvas.width = canvas.width
+	}
+
+	// Spawn off a new set of branches
+	var theta, radius;
+	var x = window.innerWidth / 2
+	var y = window.innerHeight / 2
+	for(var i = 0; i < CONFIG.NUM_BRANCHES; i++) {
+		theta = (i / CONFIG.NUM_BRANCHES) * TWO_PI;
+		radius = CONFIG.MAX_RADIUS;
+		BRANCHES.push(new Branch(x, y, theta - HALF_PI, radius));
+	}
+
+	// Iterate until all branches are dead
+	var i, n, branch;
+	while (BRANCHES.length > 0) {
+		for(i = 0, n = BRANCHES.length; i < n; i++) {
+			branch = BRANCHES[i];
+			branch.update();
+			if (doRender) branch.render(context);
+		}
+
+		// Strip dead branches
+		for(i = BRANCHES.length - 1; i >= 0; i--) {
+			if(!BRANCHES[i].growing) {
+				BRANCHES.splice(i,1);
+			}
+		}
+	}
+
+	if (doProfile)
+	{
+		var t1 = performance.now()
+		console.log("Num rand calls: " + numRandCalls)
+		console.log("Num seconds to generate: " + (t1 - t0)/1000)
+		console.log("--------------------")
+	}
+}
+
+
+/**
+Expose only the generate function
+(by writing to a global variable...I know...)
+**/
+generate = function(options) { _generate(options) }
+
+
+
+
+
+
+
