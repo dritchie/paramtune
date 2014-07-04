@@ -9324,6 +9324,9 @@ function gaussian_sample(mu,sigma)
 function gaussian_logprob(x, mu, sigma)
 {
 	return -.5*(1.8378770664093453 + 2*Math.log(sigma) + (x - mu)*(x - mu)/(sigma*sigma))
+  // var retval = -.5*(1.8378770664093453 + 2*Math.log(sigma) + (x - mu)*(x - mu)/(sigma*sigma))
+  // if (retval != retval) alert("NaN in gaussian lp! x: " + x + ", mu: " + mu + ", sigma: " + sigma);
+  // return retval;
 }
 
 GaussianRandomPrimitive.prototype.sample_impl = function Gaussian_sample_impl(params)

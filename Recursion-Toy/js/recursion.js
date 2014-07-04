@@ -496,12 +496,13 @@ GUI.add(Recursion, 'clear').name('Clear').onFire(Recursion.reset);
 GUI.add(Recursion, 'init').name('Clear & Regenerate');
 // GUI.add(Recursion, 'initComplete').name('Clear & Regenerate');
 
-//GUI.add(this, 'randomise').name('Randomise');
+GUI.add(this, 'randomise').name('Randomise');
 //GUI.add(this, 'saveConfig').name('Save Config');
 
 /** dritchie: My additions **/
 GUI.add(Tuner, 'suggest').name('Generate Suggestion')
 GUI.add(Tuner, 'likeThisTrace').name('I Like This Suggestion!')
+GUI.add(Tuner, 'dislikeThisTrace').name("I Don't Like This Suggestion...")
 GUI.add(Tuner, 'clearLikes').name('Clear Likes')
 GUI.add(Tuner, 'tune').name('Tune Parameters')
 

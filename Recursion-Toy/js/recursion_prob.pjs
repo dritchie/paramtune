@@ -6,7 +6,11 @@ All the generative code will use it.
 var numRandCalls = 0
 function random(min, max) {
 	numRandCalls += 1
-	return uniform(min, max)
+	// return uniform(min, max)
+
+	// Hackish, but it fixes some problems...
+	// if (max-min < 0 ) alert("dengerate range! min: " + min + ", max: " + max);
+	return Math.min(max, Math.max(min, gaussian(0.5*(min+max), 0.33*(max-min))))
 }
 
 
@@ -62,10 +66,12 @@ Branch.prototype = {
 			this.scale  *= this.shrinkRate;
 
 			// Branch
-			if(BRANCHES.length < CONFIG.MAX_CONCURRENT && random(0,1) < CONFIG.BRANCH_PROBABILITY) {
+			// if(BRANCHES.length < CONFIG.MAX_CONCURRENT && random(0,1) < CONFIG.BRANCH_PROBABILITY) {
+			if(1 > gaussian(BRANCHES.length/CONFIG.MAX_CONCURRENT, 0.05) && flip(CONFIG.BRANCH_PROBABILITY)) {
 				
 				var offset = random(CONFIG.MIN_DIVERGENCE, CONFIG.MAX_DIVERGENCE);
-				var theta  = this.theta + offset * (random(0,1) < 0.5 ? 1 : -1);
+				// var theta  = this.theta + offset * (random(0,1) < 0.5 ? 1 : -1);
+				var theta  = this.theta + offset * (flip(0.5) ? 1 : -1);
 				var scale  = this.scale * 0.95;
 				var radius = this.radius * scale;
 				var branch = new Branch(this.x, this.y, theta, radius, scale);
@@ -76,7 +82,8 @@ Branch.prototype = {
 			}
 
 			// Limit
-			if(this.radius * this.scale <= CONFIG.MIN_RADIUS) {
+			// if(this.radius * this.scale <= CONFIG.MIN_RADIUS) {
+			if(1 >= gaussian((this.radius * this.scale)/CONFIG.MIN_RADIUS, 0.05)) {
 				this.growing = false;
 			}
 
@@ -261,6 +268,10 @@ var context = null
 var canvas = null
 function _generate(options)
 {
+
+	// Tired of dealing with this
+	CONFIG.NUM_BRANCHES = 1
+
 	options = options || {}
 	var doRender = options.doRender
 	var doProfile = options.doProfile
@@ -294,15 +305,25 @@ function _generate(options)
 	var theta, radius;
 	var x = window.innerWidth / 2
 	var y = window.innerHeight / 2
+	var maxrad = Math.max(0, gaussian(CONFIG.MAX_RADIUS, (CONFIG.MAX_RADIUS-CONFIG.MIN_RADIUS)/20.0))
+	// var numbranches = Math.max(0, gaussian(CONFIG.NUM_BRANCHES, 0.5))
 	for(var i = 0; i < CONFIG.NUM_BRANCHES; i++) {
 		theta = (i / CONFIG.NUM_BRANCHES) * TWO_PI;
-		radius = CONFIG.MAX_RADIUS;
+	// for(var i = 0; i < numbranches; i++) {
+	// 	theta = (i / numbranches) * TWO_PI;
+		// radius = CONFIG.MAX_RADIUS;
+		radius = maxrad
 		BRANCHES.push(new Branch(x, y, theta - HALF_PI, radius));
 	}
 
 	// Iterate until all branches are dead
 	var i, n, branch;
+	// var j = 0
 	while (BRANCHES.length > 0) {
+		// j++;
+		// if (j % 100 == 0)
+		// 	alert("Num active branches: " + BRANCHES.length);
+
 		for(i = 0, n = BRANCHES.length; i < n; i++) {
 			branch = BRANCHES[i];
 			branch.update();
