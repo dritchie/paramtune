@@ -1,11 +1,11 @@
-terralib.require("prob")
+require("prob")
 
 local C = terralib.includecstring [[
 #include "stdio.h"
 #include "math.h"
 ]]
 
-local gl = terralib.require("gl")
+local gl = require("gl")
 
 
 local radians = macro(function(deg)
